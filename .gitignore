@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+*/node_modules/
+package-lock.json.bak
+
+# Environment & Secrets
+.env
+.env.*
+*.env
+!.env.example
+*.pem
+*.key
+*.cert
+
+# Next.js & Frontend build
+.next/
+*/.next/
+out/
+build/
+dist/
+.turbo/
+*.tsbuildinfo
+
+
+# Python & Testing
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.eggs/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+nexus.db
+
+# Workspaces & Runtime Artifacts
+workspaces/
+*.log
+logs/
+
+# Operating System
+.DS_Store
+Thumbs.db
