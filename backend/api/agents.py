@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from backend.database.database import get_db
 from backend.database.models import (
-    PRDDocument, Architecture, AgentRun, TestRun, TestResult, Screenshot, PullRequest, DebugReport, ReviewResult
+    PRDDocument, Architecture, AgentRun, TestRun, TestResult, Screenshot, PullRequest, PendingPullRequest, DebugReport, ReviewResult
 )
 from backend.workspace.manager import workspace_manager
 
@@ -171,4 +171,20 @@ def get_task_pull_request(task_id: str, db: Session = Depends(get_db)):
         "body": pr.body,
         "status": pr.status,
         "created_at": str(pr.created_at)
+    }
+
+
+@router.get("/pending-pull-request")
+def get_pending_pull_request(task_id: str, db: Session = Depends(get_db)):
+    pending = db.query(PendingPullRequest).filter(PendingPullRequest.task_id == task_id).first()
+    if not pending:
+        return None
+    return {
+        "id": pending.id,
+        "task_id": pending.task_id,
+        "repo_url": pending.repo_url,
+        "branch_name": pending.branch_name,
+        "title": pending.title,
+        "body": pending.body,
+        "created_at": str(pending.created_at),
     }
