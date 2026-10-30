@@ -19,7 +19,7 @@ Traditional AI coding assistants act primarily as passive autocomplete plugins o
 **Nexus** introduces an autonomous multi-agent engineering workflow that mirrors a senior software development team:
 1. **Separation of Concerns**: Six dedicated agents each handle a specific phase of the engineering lifecycle.
 2. **Deterministic Orchestrator**: Normal application backend code (not an LLM) guarantees state transitions and safety.
-3. **Dual Human-in-the-Loop Gates**: Mandatory human approval after requirements definition (PRD) and technical architecture before code is written.
+3. **Human-in-the-Loop Approval Gates**: Mandatory human approval after requirements definition (PRD) and technical architecture before code is written.
 4. **Isolated Sandboxed Workspaces**: Agents modify code strictly within task-scoped workspaces.
 5. **Real Headless Browser Verification**: Tester Agent uses **Playwright** to open browsers, test user journeys, verify responsive viewports, and capture screenshot evidence.
 6. **Autonomous Self-Correction Loop**: Tester failure triggers the Debug Agent to diagnose root cause, passes a surgical fix plan to the Developer Agent, and retests automatically.
@@ -38,7 +38,7 @@ Traditional AI coding assistants act primarily as passive autocomplete plugins o
 | **5** | **Debug / Fix Agent** | Reliability & Diagnostics | Analyzes failed test runs, browser traces, and source code. Pinpoints root cause and formulates surgical fix plans for Developer Agent. |
 | **6** | **Reviewer Agent** | Senior Staff Auditor | Inspects the final Git diff against PRD requirements, verifies passing tests, checks security posture, and authorizes Pull Request publication. |
 
-> **Note**: The **Orchestrator** is deterministic backend code (FastAPI state machine), ensuring predictable state transitions and enforcing human approval gates.
+> **Note**: The **Orchestrator** is deterministic backend code (FastAPI state machine), ensuring predictable state transitions and enforcing approval gates for the PRD, architecture, and final GitHub publication.
 
 ---
 
@@ -221,6 +221,8 @@ Nexus includes an instant end-to-end demonstration featuring the **Apex Hardware
 - SQLite single-node database for zero-config hackathon execution.
 - Sandboxed filesystem and Docker container workspace management.
 - Single-repository branch targeting.
+- Multi-file generation is available when an LLM API is configured; deterministic fallback remains limited and does not claim to build arbitrary applications.
+- Native mobile and desktop build pipelines still require platform-specific toolchains and are not yet fully implemented.
 
 ### Future Improvements
 - Multi-tenant enterprise RBAC and team workspaces.
