@@ -21,7 +21,7 @@ import Link from 'next/link';
 
 export default function NewTaskPage() {
   const router = useRouter();
-  const [repository, setRepository] = useState('sample_repo');
+  const [repository, setRepository] = useState('');
   const [featureRequest, setFeatureRequest] = useState(
     'Add a responsive contact section with name, email, message and submit button.'
   );
@@ -61,8 +61,8 @@ export default function NewTaskPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!repository.trim() || !featureRequest.trim()) {
-      setErrorMsg('Please specify both a target repository and feature request description.');
+    if (!featureRequest.trim()) {
+      setErrorMsg('Please describe what you want Nexus to build.');
       return;
     }
 
@@ -169,6 +169,14 @@ export default function NewTaskPage() {
               <div className="flex items-center space-x-2 text-[11px]">
                 <button
                   type="button"
+                  onClick={() => setRepository('')}
+                  className="text-blue-400 hover:underline"
+                >
+                  New project
+                </button>
+                <span className="text-slate-600">&bull;</span>
+                <button
+                  type="button"
                   onClick={() => setRepository('sample_repo')}
                   className="text-blue-400 hover:underline"
                 >
@@ -191,13 +199,13 @@ export default function NewTaskPage() {
                 type="text"
                 value={repository}
                 onChange={(e) => setRepository(e.target.value)}
-                placeholder="sample_repo or https://github.com/user/repo"
+                placeholder="Leave blank to create a new project, or enter a local path / GitHub URL"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono"
                 required
               />
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              Supports local sample repositories and remote GitHub repositories. A temporary isolated branch is created automatically.
+              Leave blank to start from an empty project, choose sample_repo, or enter an existing GitHub repository URL.
             </p>
           </div>
 
