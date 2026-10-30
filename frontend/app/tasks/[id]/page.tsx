@@ -13,6 +13,7 @@ import {
   fetchReview,
   fetchScreenshots,
   fetchPullRequest,
+  fetchPendingPullRequest,
   getWebSocketUrl,
 } from '../../../lib/api';
 import {
@@ -25,6 +26,7 @@ import {
   ReviewResult,
   ScreenshotItem,
   PullRequest,
+  PendingPullRequestProposal,
   NexusEvent,
 } from '../../../types';
 import { AgentPipeline } from '../../../components/AgentPipeline';
@@ -60,6 +62,7 @@ export default function TaskDetailPage() {
   const [review, setReview] = useState<ReviewResult | null>(null);
   const [screenshots, setScreenshots] = useState<ScreenshotItem[]>([]);
   const [pullRequest, setPullRequest] = useState<PullRequest | null>(null);
+  const [pendingPullRequest, setPendingPullRequest] = useState<PendingPullRequestProposal | null>(null);
 
   const [activeTab, setActiveTab] = useState<'prd' | 'architecture' | 'activity' | 'tests' | 'debug' | 'screenshots' | 'pr'>('prd');
   const userSelectedTabRef = useRef(false);
@@ -81,7 +84,7 @@ export default function TaskDetailPage() {
       const t = await fetchTask(taskId);
       setTask(t);
 
-      const [p, a, ag, te, deb, rev, sc, pr] = await Promise.all([
+      const [p, a, ag, te, deb, rev, sc, pr, pendingPr] = await Promise.all([
         fetchPRD(taskId),
         fetchArchitecture(taskId),
         fetchAgents(taskId),
@@ -90,6 +93,7 @@ export default function TaskDetailPage() {
         fetchReview(taskId),
         fetchScreenshots(taskId),
         fetchPullRequest(taskId),
+        fetchPendingPullRequest(taskId),
       ]);
 
       if (p) setPrd(p);
@@ -99,7 +103,8 @@ export default function TaskDetailPage() {
       if (deb) setDebugReports(deb);
       if (rev) setReview(rev);
       if (sc) setScreenshots(sc);
-      if (pr) setPullRequest(pr);
+      setPullRequest(pr);
+      setPendingPullRequest(pendingPr);
 
       // Auto switch tabs based on lifecycle only when status transitions OR user has not manually chosen a tab
       const statusChanged = prevStatusRef.current !== t.status;
@@ -686,9 +691,27 @@ export default function TaskDetailPage() {
         {activeTab === 'pr' && (
           <div className="space-y-6">
             {!pullRequest ? (
-              <div className="text-center py-12 text-slate-500 text-xs">
-                Pull Request will be generated after Reviewer Agent approves the final diff.
-              </div>
+              pendingPullRequest ? (
+                <div className="space-y-4">
+                  <div className="border-b border-slate-800 pb-4">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                      Awaiting Your Publication Approval
+                    </span>
+                    <h2 className="text-lg font-bold text-white mt-2">{pendingPullRequest.title}</h2>
+                    <p className="text-xs text-slate-400">Proposed branch: <code className="text-blue-400">{pendingPullRequest.branch_name}</code></p>
+                    <p className="text-xs text-slate-400">Repository: <code>{pendingPullRequest.repo_url || 'New local project'}</code></p>
+                  </div>
+                  <div className="bg-slate-950 p-5 rounded-xl border border-slate-800">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Proposed Pull Request Description</h3>
+                    <pre className="text-xs font-mono text-slate-300 whitespace-pre-wrap leading-relaxed">{pendingPullRequest.body}</pre>
+                  </div>
+                  <p className="text-xs text-slate-400">Review the proposal above. Use the approval control at the top of this page to allow Nexus to publish it.</p>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-slate-500 text-xs">
+                  Pull Request proposal will appear after the Reviewer Agent completes its audit.
+                </div>
+              )
             ) : (
               <>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
