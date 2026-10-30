@@ -34,6 +34,7 @@ class Task(Base):
     review_results = relationship("ReviewResult", back_populates="task", cascade="all, delete-orphan")
     screenshots = relationship("Screenshot", back_populates="task", cascade="all, delete-orphan")
     pull_requests = relationship("PullRequest", back_populates="task", cascade="all, delete-orphan")
+    pending_pull_request = relationship("PendingPullRequest", back_populates="task", cascade="all, delete-orphan", uselist=False)
 
 class AgentRun(Base):
     __tablename__ = "agent_runs"
@@ -168,3 +169,18 @@ class PullRequest(Base):
     created_at = Column(DateTime, default=utcnow)
 
     task = relationship("Task", back_populates="pull_requests")
+
+
+class PendingPullRequest(Base):
+    """Persisted PR publication proposal awaiting explicit human approval."""
+    __tablename__ = "pending_pull_requests"
+
+    id = Column(String(64), primary_key=True, default=generate_uuid)
+    task_id = Column(String(64), ForeignKey("tasks.id"), nullable=False, unique=True)
+    repo_url = Column(String(512), nullable=False)
+    branch_name = Column(String(128), nullable=False)
+    title = Column(String(255), nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=utcnow)
+
+    task = relationship("Task", back_populates="pending_pull_request")
