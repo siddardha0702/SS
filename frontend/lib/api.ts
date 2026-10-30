@@ -1,4 +1,4 @@
-import { Task, PRDDocument, ArchitectureDocument, AgentRun, TestRun, ScreenshotItem, PullRequest, DebugReport, ReviewResult } from '../types';
+import { Task, PRDDocument, ArchitectureDocument, AgentRun, TestRun, ScreenshotItem, PullRequest, PendingPullRequestProposal, DebugReport, ReviewResult } from '../types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -123,6 +123,16 @@ export async function fetchScreenshots(taskId: string): Promise<ScreenshotItem[]
     return res.json();
   } catch {
     return [];
+  }
+}
+
+export async function fetchPendingPullRequest(taskId: string): Promise<PendingPullRequestProposal | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/tasks/${taskId}/pending-pull-request`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
   }
 }
 
