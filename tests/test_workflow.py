@@ -3,7 +3,7 @@ import pytest
 import asyncio
 from pathlib import Path
 from backend.database.database import init_db, SessionLocal
-from backend.database.models import Task, PRDDocument, Architecture, TestRun, DebugReport, ReviewResult, PullRequest
+from backend.database.models import Task, PRDDocument, Architecture, TestRun, DebugReport, ReviewResult, PullRequest, PendingPullRequest
 from backend.orchestrator.workflow import orchestrator
 from backend.orchestrator.state import TaskState
 
@@ -51,6 +51,17 @@ def test_end_to_end_orchestrator_flow():
         # 5. Human Approval Gate 2: Approve Architecture -> Full Autonomous Execution
         # Runs Development -> Testing (fails on mobile) -> Debug -> Fix -> Retesting (passes) -> Review -> PR
         await orchestrator.approve_architecture(task_id)
+
+        db = SessionLocal()
+        pending_task = db.query(Task).filter(Task.id == task_id).first()
+        assert pending_task.status == TaskState.PR_PENDING_APPROVAL.value
+        pending_pr = db.query(PendingPullRequest).filter(PendingPullRequest.task_id == task_id).first()
+        assert pending_pr is not None
+        assert db.query(PullRequest).filter(PullRequest.task_id == task_id).first() is None
+        db.close()
+
+        # 6. Human approval is required before publishing the reviewed branch.
+        await orchestrator.approve_pull_request(task_id)
 
         db = SessionLocal()
         final_task = db.query(Task).filter(Task.id == task_id).first()
