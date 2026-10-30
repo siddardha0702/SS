@@ -201,7 +201,6 @@ export default function NewTaskPage() {
                 onChange={(e) => setRepository(e.target.value)}
                 placeholder="Leave blank to create a new project, or enter a local path / GitHub URL"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono"
-                required
               />
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
