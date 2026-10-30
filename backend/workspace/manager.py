@@ -48,28 +48,30 @@ class WorkspaceManager:
 
         git_cmd = get_git_command()
 
-        # Populate repository directory
-        if repo_source:
-            if repo_source.startswith("http://") or repo_source.startswith("https://") or repo_source.startswith("git@"):
-                # Clone git repository
+        # An explicit empty string means "start a new project".
+        # None is reserved for the legacy demo default.
+        if repo_source is not None:
+            source = repo_source.strip()
+            if not source:
+                # Keep the repository directory empty for a fresh application.
+                pass
+            elif source.startswith(("http://", "https://", "git@")):
                 try:
                     subprocess.run(
-                        [git_cmd, "clone", repo_source, str(repo_dir)],
+                        [git_cmd, "clone", source, str(repo_dir)],
                         check=True,
                         capture_output=True,
                         text=True,
                         timeout=120
                     )
                 except Exception as e:
-                    raise RuntimeError(f"Failed to clone repository {repo_source}: {str(e)}")
-            elif os.path.exists(repo_source):
-                # Copy from local sample repo
-                shutil.copytree(repo_source, repo_dir, dirs_exist_ok=True)
+                    raise RuntimeError(f"Failed to clone repository {source}: {str(e)}")
+            elif os.path.exists(source):
+                shutil.copytree(source, repo_dir, dirs_exist_ok=True)
             else:
-                # Default initialize an empty repo
-                pass
+                raise FileNotFoundError(f"Repository source does not exist: {source}")
         else:
-            # Check if sample_repo exists, copy it as default demo repo
+            # Preserve the explicit legacy demo behavior only when no source was supplied.
             sample_repo_path = Path("sample_repo").resolve()
             if sample_repo_path.is_dir() and any(sample_repo_path.iterdir()):
                 shutil.copytree(sample_repo_path, repo_dir, dirs_exist_ok=True)
