@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { TaskState } from '../types';
-import { approvePRD, rejectPRD, approveArchitecture, rejectArchitecture } from '../lib/api';
+import { approvePRD, rejectPRD, approveArchitecture, rejectArchitecture, approvePullRequest } from '../lib/api';
 import { ShieldCheck, AlertTriangle, Check, X, Loader2 } from 'lucide-react';
 
 interface ApprovalBannerProps {
@@ -18,16 +18,19 @@ export const ApprovalBanner: React.FC<ApprovalBannerProps> = ({ taskId, status, 
 
   const isPRDGate = status === 'PRD_PENDING_APPROVAL';
   const isArchGate = status === 'ARCHITECTURE_PENDING_APPROVAL';
+  const isPRGate = status === 'PR_PENDING_APPROVAL';
 
-  if (!isPRDGate && !isArchGate) return null;
+  if (!isPRDGate && !isArchGate && !isPRGate) return null;
 
   const handleApprove = async () => {
     setLoading(true);
     try {
       if (isPRDGate) {
         await approvePRD(taskId);
-      } else {
+      } else if (isArchGate) {
         await approveArchitecture(taskId);
+      } else {
+        await approvePullRequest(taskId);
       }
       onActionComplete();
     } catch (err) {
@@ -42,7 +45,7 @@ export const ApprovalBanner: React.FC<ApprovalBannerProps> = ({ taskId, status, 
     try {
       if (isPRDGate) {
         await rejectPRD(taskId, feedback || 'User requested revisions to PRD');
-      } else {
+      } else if (isArchGate) {
         await rejectArchitecture(taskId, feedback || 'User requested revisions to Architecture');
       }
       setShowRejectModal(false);
@@ -64,32 +67,36 @@ export const ApprovalBanner: React.FC<ApprovalBannerProps> = ({ taskId, status, 
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-xs font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30">
-                {isPRDGate ? 'Human Gate 1 Required' : 'Human Gate 2 Required'}
+                {isPRDGate ? 'Human Gate 1 Required' : isArchGate ? 'Human Gate 2 Required' : 'Final Publication Approval'}
               </span>
               <span className="text-xs text-slate-400">&bull; Deterministic Enforcement</span>
             </div>
             <h3 className="text-base font-bold text-white mt-1">
               {isPRDGate
                 ? 'PRD Ready for Your Explicit Approval'
-                : 'Architecture Blueprint Ready for Your Explicit Approval'}
+                : isArchGate
+                  ? 'Architecture Blueprint Ready for Your Explicit Approval'
+                  : 'Verified Build Ready — Approve GitHub Publication'}
             </h3>
             <p className="text-xs text-slate-300 mt-0.5 max-w-2xl leading-relaxed">
               {isPRDGate
                 ? 'Inspect the generated product requirements document below. Upon approval, the Architect Agent will analyze repository context and design technical specifications.'
-                : 'Inspect the technical architecture blueprint below. Upon approval, Developer Agent will be provisioned in the isolated workspace to implement code and Playwright tests.'}
+                : isArchGate
+                  ? 'Inspect the technical architecture blueprint below. Upon approval, Developer Agent will be provisioned in the isolated workspace to implement code and Playwright tests.'
+                  : 'The implementation has passed automated tests and the Reviewer Agent. Approving this action allows Nexus to push the branch and create a GitHub pull request.'}
             </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-3 flex-shrink-0">
-          <button
+          {!isPRGate && <button
             onClick={() => setShowRejectModal(true)}
             disabled={loading}
             className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-red-950/40 text-slate-300 hover:text-red-400 border border-slate-700 hover:border-red-500/40 text-xs font-semibold transition flex items-center space-x-1.5"
           >
             <X className="w-4 h-4" />
             <span>Reject / Request Changes</span>
-          </button>
+          </button>}
 
           <button
             onClick={handleApprove}
@@ -101,7 +108,7 @@ export const ApprovalBanner: React.FC<ApprovalBannerProps> = ({ taskId, status, 
             ) : (
               <Check className="w-4 h-4" />
             )}
-            <span>{isPRDGate ? 'Approve PRD' : 'Approve Architecture'}</span>
+            <span>{isPRDGate ? 'Approve PRD' : isArchGate ? 'Approve Architecture' : 'Approve & Publish PR'}</span>
           </button>
         </div>
       </div>
