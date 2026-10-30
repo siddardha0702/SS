@@ -157,7 +157,10 @@ class NexusOrchestrator:
             arch_data = {
                 "summary": arch_doc.summary if arch_doc else "",
                 "architecture": arch_doc.architecture if arch_doc else "",
-                "files_to_modify": json.loads(arch_doc.files_to_modify) if arch_doc else ["index.html"]
+                "files_to_modify": json.loads(arch_doc.files_to_modify) if arch_doc else ["index.html"],
+                "files_to_create": json.loads(arch_doc.files_to_create) if arch_doc else [],
+                "dependencies": json.loads(arch_doc.dependencies) if arch_doc and arch_doc.dependencies else [],
+                "implementation_steps": json.loads(arch_doc.implementation_steps) if arch_doc else []
             }
         finally:
             db.close()
