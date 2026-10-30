@@ -4,6 +4,7 @@ from typing import Dict, Any, List, Optional
 from backend.agents.base_agent import BaseAgent
 from backend.tools.filesystem import list_files, read_file, write_file, edit_file
 from backend.tools.git import git_diff, git_commit, init_or_branch
+from backend.workspace.manager import workspace_manager
 
 logger = logging.getLogger("nexus.agent.developer")
 
@@ -13,6 +14,119 @@ class DeveloperAgent(BaseAgent):
             name="developer_agent",
             role_description="Executes code modifications and fixes in the isolated repository workspace."
         )
+
+    async def _execute_multi_file(
+        self,
+        task_id: str,
+        prd_data: Dict[str, Any],
+        arch_data: Dict[str, Any],
+        branch_name: str,
+        fix_plan: Optional[Dict[str, Any]],
+        run_id: str,
+        tool_calls: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Generate a complete, validated set of planned file changes in one LLM pass."""
+        inventory = set(list_files(task_id, "."))
+        modify_paths = arch_data.get("files_to_modify") or []
+        create_paths = arch_data.get("files_to_create") or []
+        planned_paths = list(dict.fromkeys(str(p) for p in (modify_paths + create_paths)))
+        if not planned_paths or len(planned_paths) > 20:
+            raise ValueError("Multi-file plan must contain between 1 and 20 explicit paths.")
+
+        source_files: Dict[str, str] = {}
+        for path in planned_paths:
+            normalized = path.replace("\\", "/")
+            parts = normalized.split("/")
+            if (
+                not normalized or normalized.startswith("/") or
+                any(part in ("", ".", "..") for part in parts) or
+                parts[0] == ".git" or
+                any(part in ("node_modules", ".next", ".venv", "__pycache__") for part in parts) or
+                parts[-1] == ".env" or parts[-1].startswith(".env.")
+            ):
+                raise ValueError(f"Unsafe or protected path in architecture plan: {path}")
+            workspace_manager.resolve_safe_path(task_id, normalized)
+            if normalized in inventory:
+                source_files[normalized] = read_file(task_id, normalized)[:18000]
+
+        await self.emit_progress(
+            task_id, "working",
+            f"Preparing a multi-file implementation across {len(planned_paths)} planned files..."
+        )
+        system_prompt = (
+            "You are Nexus's senior full-stack implementation agent. Implement the approved application "
+            "requirements across the complete planned file set. Return ONLY a JSON object with a 'files' "
+            "array. Each item must contain exactly 'path', 'content', and 'summary'. Include every planned "
+            "path exactly once; do not add unplanned paths. 'content' must be the complete replacement or "
+            "new file content, not a diff. Preserve existing behavior and conventions. Do not invent secrets, "
+            "credentials, or external service keys. Do not claim integrations work unless code is included. "
+            "Do not output TODOs, placeholders, or explanatory prose outside the JSON."
+        )
+        user_prompt = (
+            f"Approved PRD:\\n{json.dumps(prd_data, indent=2)}\\n\\n"
+            f"Approved architecture:\\n{json.dumps(arch_data, indent=2)}\\n\\n"
+            f"Existing source files (empty means the file is planned for creation):\\n"
+            f"{json.dumps(source_files, indent=2)}\\n\\n"
+            f"Exact required paths, each exactly once: {json.dumps(planned_paths)}\\n"
+            f"Debug fix plan, if this is a repair: {json.dumps(fix_plan or {}, indent=2)}"
+        )
+        response = self.call_llm_json(system_prompt, user_prompt)
+        generated = response.get("files")
+        if not isinstance(generated, list):
+            raise ValueError("Developer response must contain a files array.")
+
+        expected = set(planned_paths)
+        received: Dict[str, Dict[str, Any]] = {}
+        total_bytes = 0
+        for item in generated:
+            if not isinstance(item, dict):
+                raise ValueError("Each generated file must be a JSON object.")
+            path = item.get("path")
+            content = item.get("content")
+            if not isinstance(path, str) or not isinstance(content, str):
+                raise ValueError("Each generated file requires string path and content fields.")
+            path = path.replace("\\", "/")
+            if path not in expected or path in received:
+                raise ValueError(f"Developer returned an unplanned or duplicate path: {path}")
+            if len(content.encode("utf-8")) > 200_000:
+                raise ValueError(f"Generated file exceeds the 200 KB limit: {path}")
+            total_bytes += len(content.encode("utf-8"))
+            received[path] = item
+        if set(received) != expected:
+            missing = sorted(expected - set(received))
+            raise ValueError(f"Developer omitted planned files: {missing}")
+        if total_bytes > 1_000_000:
+            raise ValueError("Generated change set exceeds the 1 MB safety limit.")
+
+        # Validate every path and every output before writing any file.
+        for path in received:
+            workspace_manager.resolve_safe_path(task_id, path)
+        for path in planned_paths:
+            write_file(task_id, path, received[path]["content"])
+            tool_calls.append({"tool": "write_file", "args": {"path": path}})
+
+        summary = "; ".join(
+            f"{path}: {received[path].get('summary', 'updated')}" for path in planned_paths
+        )
+        commit_msg = "feat: implement approved multi-file project plan" if not fix_plan else "fix: apply approved multi-file repair plan"
+        git_commit(task_id, commit_msg)
+        tool_calls.append({"tool": "git_commit", "args": {"message": commit_msg}})
+        diff_output = git_diff(task_id)
+        tool_calls.append({"tool": "git_diff", "args": {}, "diff_length": len(diff_output)})
+        result = {
+            "target_file": planned_paths[0],
+            "files_modified": planned_paths,
+            "summary": summary,
+            "git_diff": diff_output,
+            "branch": branch_name,
+        }
+        self.log_run_complete(run_id, f"Updated {len(planned_paths)} files", tool_calls=tool_calls)
+        await self.emit_progress(
+            task_id, "completed",
+            f"Multi-file implementation committed ({len(planned_paths)} files).",
+            data=result,
+        )
+        return result
 
     async def execute(
         self,
@@ -35,6 +149,19 @@ class DeveloperAgent(BaseAgent):
             await self.emit_progress(task_id, "working", f"Checked out branch: {branch_name}")
         except Exception as e:
             logger.warning(f"Branch checkout warning for task {task_id}: {e}")
+
+        planned_modify = arch_data.get("files_to_modify") or []
+        planned_create = arch_data.get("files_to_create") or []
+        planned_count = len(set(str(p) for p in (planned_modify + planned_create)))
+        if self.client and (planned_count > 1 or planned_create):
+            try:
+                return await self._execute_multi_file(
+                    task_id, prd_data, arch_data, branch_name, fix_plan, run_id, tool_calls
+                )
+            except Exception as e:
+                self.log_run_complete(run_id, "Multi-file implementation stopped before reporting success", tool_calls=tool_calls, status="failed", error=str(e))
+                await self.emit_progress(task_id, "failed", f"Multi-file implementation could not be completed safely: {e}")
+                raise
 
         files = list_files(task_id, ".")
         target_files = arch_data.get("files_to_modify", ["index.html"])
