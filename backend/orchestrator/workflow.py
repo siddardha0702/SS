@@ -6,7 +6,7 @@ from backend.config import settings
 from backend.orchestrator.state import TaskState, AgentName
 from backend.orchestrator.events import manager
 from backend.database.database import SessionLocal
-from backend.database.models import Task, PRDDocument, Architecture, PullRequest, AgentRun
+from backend.database.models import Task, PRDDocument, Architecture, PullRequest, PendingPullRequest, AgentRun
 from backend.workspace.docker_manager import docker_manager
 from backend.agents.prd_agent import prd_agent
 from backend.agents.architect_agent import architect_agent
@@ -336,56 +336,91 @@ class NexusOrchestrator:
 {review_result.get('summary', 'Approved by Nexus Reviewer Agent')}
 """
 
+        # Persist the reviewed PR proposal and wait for explicit publication approval.
+        db = SessionLocal()
+        try:
+            pending = db.query(PendingPullRequest).filter(PendingPullRequest.task_id == task_id).first()
+            if pending:
+                db.delete(pending)
+            db.add(PendingPullRequest(
+                task_id=task_id,
+                repo_url=repo_url,
+                branch_name=branch_name,
+                title=pr_title,
+                body=pr_body,
+            ))
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if task:
+                task.status = TaskState.PR_PENDING_APPROVAL.value
+                task.current_agent = None
+            db.commit()
+        finally:
+            db.close()
+
+        await manager.broadcast(
+            task_id,
+            "orchestrator",
+            "waiting_for_approval",
+            "Implementation passed review. Approve publication before Nexus pushes the branch or creates a GitHub PR.",
+            data={"pull_request_proposal": {"title": pr_title, "branch_name": branch_name, "body": pr_body}}
+        )
+
+    async def approve_pull_request(self, task_id: str):
+        """Publish a reviewed pull request only after explicit user approval."""
+        db = SessionLocal()
+        try:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            pending = db.query(PendingPullRequest).filter(PendingPullRequest.task_id == task_id).first()
+            if not task or not pending or task.status != TaskState.PR_PENDING_APPROVAL.value:
+                return
+            repo_url = pending.repo_url
+            branch_name = pending.branch_name
+            pr_title = pending.title
+            pr_body = pending.body
+            task.status = TaskState.PR_CREATING.value
+            db.commit()
+        finally:
+            db.close()
+
+        self._update_task_state(task_id, TaskState.PR_CREATING, current_agent=None)
+        await manager.broadcast(task_id, "orchestrator", "working", "Publication approved. Preparing GitHub pull request...")
+
         parsed_repo = parse_github_repo(repo_url)
         github_token = settings.GITHUB_TOKEN.strip() if settings.GITHUB_TOKEN else ""
-
-        # Real GitHub remote push if configured
         if parsed_repo and github_token:
             owner, repo_name = parsed_repo
             auth_remote_url = f"https://x-access-token:{github_token}@github.com/{owner}/{repo_name}.git"
             await manager.broadcast(
-                task_id,
-                "orchestrator",
-                "working",
-                f"Pushing branch '{branch_name}' to remote repository '{owner}/{repo_name}'..."
+                task_id, "orchestrator", "working",
+                f"Pushing approved branch '{branch_name}' to '{owner}/{repo_name}'..."
             )
             setup_remote(task_id, auth_remote_url, remote_name="origin")
             push_res = git_push(task_id, branch_name=branch_name, remote="origin")
             if not push_res.get("success"):
                 err_msg = push_res.get("stderr") or push_res.get("stdout") or "Push failed"
-                logger.error(f"Failed to push task branch to GitHub for task {task_id}: {err_msg}")
                 self._update_task_state(task_id, TaskState.NEEDS_HUMAN_REVIEW, error=f"Git push failed: {err_msg}")
-                await manager.broadcast(
-                    task_id,
-                    "orchestrator",
-                    "failed",
-                    f"Failed to push branch to GitHub remote: {err_msg}"
-                )
+                await manager.broadcast(task_id, "orchestrator", "failed", f"Failed to push approved branch: {err_msg}")
                 return
 
-        pr_info = create_pull_request(
-            repo_url=repo_url,
-            branch_name=branch_name,
-            title=pr_title,
-            body=pr_body
-        )
+        try:
+            pr_info = create_pull_request(
+                repo_url=repo_url,
+                branch_name=branch_name,
+                title=pr_title,
+                body=pr_body
+            )
+        except Exception as e:
+            pr_info = {"success": False, "message": str(e)}
 
         if not pr_info.get("success", True):
             err_msg = pr_info.get("message", "GitHub PR creation failed")
-            logger.error(f"Task {task_id}: PR creation failed: {err_msg}")
             self._update_task_state(task_id, TaskState.NEEDS_HUMAN_REVIEW, error=err_msg)
-            await manager.broadcast(
-                task_id,
-                "orchestrator",
-                "failed",
-                f"Failed to create GitHub Pull Request: {err_msg}"
-            )
+            await manager.broadcast(task_id, "orchestrator", "failed", f"Failed to create approved GitHub Pull Request: {err_msg}")
             return
 
-        # Save PR in database
         db = SessionLocal()
         try:
-            pr_record = PullRequest(
+            db.add(PullRequest(
                 task_id=task_id,
                 pr_number=pr_info.get("pr_number"),
                 pr_url=pr_info.get("pr_url"),
@@ -393,23 +428,23 @@ class NexusOrchestrator:
                 title=pr_title,
                 body=pr_body,
                 status="open"
-            )
-            db.add(pr_record)
-
-            t = db.query(Task).filter(Task.id == task_id).first()
-            if t:
-                t.github_pr_url = pr_info.get("pr_url")
-                t.status = TaskState.COMPLETED.value
+            ))
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if task:
+                task.github_pr_url = pr_info.get("pr_url")
+                task.status = TaskState.COMPLETED.value
+                task.current_agent = None
+            pending = db.query(PendingPullRequest).filter(PendingPullRequest.task_id == task_id).first()
+            if pending:
+                db.delete(pending)
             db.commit()
         finally:
             db.close()
 
         self._update_task_state(task_id, TaskState.COMPLETED)
         await manager.broadcast(
-            task_id,
-            "orchestrator",
-            "completed",
-            f"Task fully completed! Pull Request created: {pr_info.get('pr_url')}",
+            task_id, "orchestrator", "completed",
+            f"Task completed. Pull Request created: {pr_info.get('pr_url')}",
             data={"pull_request": pr_info}
         )
 
