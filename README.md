@@ -218,11 +218,13 @@ Nexus includes an instant end-to-end demonstration featuring the **Apex Hardware
 ## 11. Limitations & Future Roadmap
 
 ### Current MVP Scope
-- SQLite single-node database for zero-config hackathon execution.
-- Sandboxed filesystem and Docker container workspace management.
-- Single-repository branch targeting.
-- Multi-file generation is available when an LLM API is configured; deterministic fallback remains limited and does not claim to build arbitrary applications.
-- Native mobile and desktop build pipelines still require platform-specific toolchains and are not yet fully implemented.
+- SQLite single-node database for zero-config local execution.
+- Workspace path traversal checks and optional Docker execution. Local shell execution is not a strong security boundary.
+- Repository-aware project detection for common web, backend, mobile, and desktop frameworks.
+- LLM-powered multi-file generation for approved plans, with bounded file counts and output sizes.
+- Support for starting a blank project or working from an existing local / GitHub repository.
+- Explicit user approval before Nexus pushes a branch and publishes a GitHub pull request.
+- Native mobile and desktop build/test pipelines still require platform-specific toolchains and are not yet complete.
 
 ### Future Improvements
 - Multi-tenant enterprise RBAC and team workspaces.
