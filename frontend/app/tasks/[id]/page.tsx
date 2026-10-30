@@ -108,7 +108,7 @@ export default function TaskDetailPage() {
       if (!userSelectedTabRef.current || statusChanged) {
         if (t.status === 'PRD_PENDING_APPROVAL') setActiveTab('prd');
         else if (t.status === 'ARCHITECTURE_PENDING_APPROVAL') setActiveTab('architecture');
-        else if (t.status === 'COMPLETED' && pr) setActiveTab('pr');
+        else if ((t.status === 'PR_PENDING_APPROVAL' || t.status === 'COMPLETED') && (pr || t.status === 'PR_PENDING_APPROVAL')) setActiveTab('pr');
         else if (['TESTING', 'RETESTING'].includes(t.status)) setActiveTab('tests');
         else if (['DEBUGGING', 'FIXING'].includes(t.status)) setActiveTab('debug');
       }
@@ -491,6 +491,12 @@ export default function TaskDetailPage() {
                       {(architecture.files_to_modify || []).map((f, i) => (
                         <div key={i} className="text-xs font-mono bg-slate-900/60 p-2 rounded border border-slate-800 text-blue-300 flex items-center space-x-2">
                           <span className="text-amber-400 text-[10px]">MOD</span>
+                          <span>{f}</span>
+                        </div>
+                      ))}
+                      {(architecture.files_to_create || []).map((f, i) => (
+                        <div key={`new-${i}`} className="text-xs font-mono bg-slate-900/60 p-2 rounded border border-slate-800 text-emerald-300 flex items-center space-x-2">
+                          <span className="text-emerald-400 text-[10px]">NEW</span>
                           <span>{f}</span>
                         </div>
                       ))}
