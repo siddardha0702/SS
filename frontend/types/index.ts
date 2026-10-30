@@ -11,7 +11,7 @@ export type TaskState =
   | 'FIXING'
   | 'RETESTING'
   | 'REVIEW'
-  | 'PR_CREATING'
+  | 'PR_PENDING_APPROVAL'\n  | 'PR_CREATING'
   | 'COMPLETED'
   | 'PRD_FAILED'
   | 'ARCHITECTURE_FAILED'
