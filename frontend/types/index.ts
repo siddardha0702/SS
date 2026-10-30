@@ -138,3 +138,14 @@ export interface NexusEvent {
   timestamp: string;
   data?: any;
 }
+
+
+export interface PendingPullRequestProposal {
+  id: string;
+  task_id: string;
+  repo_url: string;
+  branch_name: string;
+  title: string;
+  body: string;
+  created_at: string;
+}
