@@ -41,14 +41,14 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({ status, currentAge
       case 'debug':
         if (status === 'DEBUGGING') return 'running';
         if (status === 'DEBUG_FAILED') return 'failed';
-        if (['FIXING', 'RETESTING', 'REVIEW', 'PR_CREATING', 'COMPLETED'].includes(status) && retryCount > 0) return 'completed';
+        if (['FIXING', 'RETESTING', 'REVIEW', 'PR_PENDING_APPROVAL', 'PR_CREATING', 'COMPLETED'].includes(status) && retryCount > 0) return 'completed';
         if (status === 'NEEDS_HUMAN_REVIEW') return 'failed';
         return 'waiting';
 
       case 'reviewer':
         if (status === 'REVIEW') return 'running';
         if (status === 'REVIEW_FAILED') return 'failed';
-        if (['PR_CREATING', 'COMPLETED'].includes(status)) return 'completed';
+        if (['PR_PENDING_APPROVAL', 'PR_CREATING', 'COMPLETED'].includes(status)) return 'completed';
         return 'waiting';
 
       default:
