@@ -23,7 +23,7 @@ export default function NewTaskPage() {
   const router = useRouter();
   const [repository, setRepository] = useState('');
   const [featureRequest, setFeatureRequest] = useState(
-    'Add a responsive contact section with name, email, message and submit button.'
+    'Build a modern, responsive task management application with projects, tasks, and a clear dashboard.'
   );
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -210,18 +210,18 @@ export default function NewTaskPage() {
 
           <div>
             <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-              Feature Request / Engineering Objective
+              What Should Nexus Build?
             </label>
             <textarea
               value={featureRequest}
               onChange={(e) => setFeatureRequest(e.target.value)}
-              placeholder="Describe the feature requirement or bug fix in natural language..."
+              placeholder="Describe the website or app, its screens, features, data, and expected behavior..."
               rows={4}
               className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 leading-relaxed"
               required
             />
             <p className="text-[11px] text-slate-500 mt-1">
-              Be descriptive. The PRD Agent will formalize this into strict acceptance criteria, Definition of Done, and edge cases.
+              Describe the complete outcome you want. Nexus will turn your idea into requirements, architecture, and an implementation plan for your approval.
             </p>
           </div>
 
