@@ -122,7 +122,7 @@ cp .env.example .env
 ```
 Edit `.env` (all secrets are optional for local demo mode!):
 ```env
-# Optional: OpenAI API Key (falls back to intelligent synthesizer if omitted)
+# Required for arbitrary multi-file application generation. Without it, only limited demo fallbacks are available.
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-4o
 
@@ -211,7 +211,7 @@ Nexus includes an instant end-to-end demonstration featuring the **Apex Hardware
    - **Developer Agent** applies targeted fix: removes `'hidden md:'` constraint.
    - **Tester Agent** retests at 375px: Assertion passes! Captures updated screenshot.
 9. **Final Review**: Reviewer Agent audits the Git diff and approves the code changes.
-10. **Delivery**: Verified Pull Request is generated with test logs, diff breakdown, and screenshot proofs!
+10. **Publication Approval**: Nexus displays the proposed PR title, branch, and description. The user must explicitly approve before Nexus pushes the branch and creates the GitHub PR.
 
 ---
 
