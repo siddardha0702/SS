@@ -371,7 +371,7 @@ class NexusOrchestrator:
         try:
             task = db.query(Task).filter(Task.id == task_id).first()
             pending = db.query(PendingPullRequest).filter(PendingPullRequest.task_id == task_id).first()
-            if not task or not pending or task.status != TaskState.PR_PENDING_APPROVAL.value:
+            if not task or not pending or task.status not in (TaskState.PR_PENDING_APPROVAL.value, TaskState.PR_CREATING.value):
                 return
             repo_url = pending.repo_url
             branch_name = pending.branch_name
