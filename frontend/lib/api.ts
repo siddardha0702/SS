@@ -46,7 +46,13 @@ export async function approveArchitecture(taskId: string): Promise<any> {
   return res.json();
 }
 
-export async function approvePullRequest(taskId: string): Promise<any> {\n  const res = await fetch(`${API_BASE}/api/tasks/${taskId}/approve-pull-request`, { method: 'POST' });\n  if (!res.ok) throw new Error('Failed to approve pull request publication');\n  return res.json();\n}\n\nexport async function rejectArchitecture(taskId: string, feedback: string): Promise<any> {
+export async function approvePullRequest(taskId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/tasks/${taskId}/approve-pull-request`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to approve pull request publication');
+  return res.json();
+}
+
+export async function rejectArchitecture(taskId: string, feedback: string): Promise<any> {
   const res = await fetch(`${API_BASE}/api/tasks/${taskId}/reject-architecture`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
