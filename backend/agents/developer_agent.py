@@ -27,6 +27,7 @@ class DeveloperAgent(BaseAgent):
     ) -> Dict[str, Any]:
         """Generate a complete, validated set of planned file changes in one LLM pass."""
         inventory = set(list_files(task_id, "."))
+        repository_file_tree = sorted(inventory)[:150]
         modify_paths = arch_data.get("files_to_modify") or []
         create_paths = arch_data.get("files_to_create") or []
         planned_paths = list(dict.fromkeys(str(p) for p in (modify_paths + create_paths)))
@@ -34,20 +35,24 @@ class DeveloperAgent(BaseAgent):
             raise ValueError("Multi-file plan must contain between 1 and 20 explicit paths.")
 
         source_files: Dict[str, str] = {}
+        source_budget = 80000
         for path in planned_paths:
             normalized = path.replace("\\", "/")
             parts = normalized.split("/")
             if (
                 not normalized or normalized.startswith("/") or
                 any(part in ("", ".", "..") for part in parts) or
-                parts[0] == ".git" or
+                ":" in parts[0] or
+                any(part == ".git" for part in parts) or
                 any(part in ("node_modules", ".next", ".venv", "__pycache__") for part in parts) or
-                parts[-1] == ".env" or parts[-1].startswith(".env.")
+                parts[-1].startswith(".env")
             ):
                 raise ValueError(f"Unsafe or protected path in architecture plan: {path}")
             workspace_manager.resolve_safe_path(task_id, normalized)
-            if normalized in inventory:
-                source_files[normalized] = read_file(task_id, normalized)[:18000]
+            if normalized in inventory and source_budget > 0:
+                content = read_file(task_id, normalized)
+                source_files[normalized] = content[:source_budget]
+                source_budget -= len(source_files[normalized])
 
         await self.emit_progress(
             task_id, "working",
@@ -62,12 +67,23 @@ class DeveloperAgent(BaseAgent):
             "credentials, or external service keys. Do not claim integrations work unless code is included. "
             "Do not output TODOs, placeholders, or explanatory prose outside the JSON."
         )
+        context_files: Dict[str, str] = {}
+        for context_path in (
+            "package.json", "pyproject.toml", "requirements.txt", "tsconfig.json",
+            "next.config.js", "next.config.mjs", "vite.config.ts", "pubspec.yaml",
+            "Cargo.toml", "go.mod", "README.md"
+        ):
+            if context_path in inventory and context_path not in source_files:
+                context_files[context_path] = read_file(task_id, context_path)[:8000]
+
         user_prompt = (
             f"Approved PRD:\n{json.dumps(prd_data, indent=2)}\n\n"
             f"Approved architecture:\n{json.dumps(arch_data, indent=2)}\n\n"
-            f"Existing source files (empty means the file is planned for creation):\\n"
-            f"{json.dumps(source_files, indent=2)}\\n\\n"
-            f"Exact required paths, each exactly once: {json.dumps(planned_paths)}\\n"
+            f"Repository file tree (bounded):\n{json.dumps(repository_file_tree, indent=2)}\n\n"
+            f"Project manifests and setup context:\n{json.dumps(context_files, indent=2)}\n\n"
+            f"Existing source files (empty means the file is planned for creation):\n"
+            f"{json.dumps(source_files, indent=2)}\n\n"
+            f"Exact required paths, each exactly once: {json.dumps(planned_paths)}\n"
             f"Debug fix plan, if this is a repair: {json.dumps(fix_plan or {}, indent=2)}"
         )
         response = self.call_llm_json(system_prompt, user_prompt)
