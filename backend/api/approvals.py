@@ -60,5 +60,8 @@ async def approve_pull_request(task_id: str, background_tasks: BackgroundTasks, 
     if task.status != "PR_PENDING_APPROVAL":
         raise HTTPException(status_code=400, detail=f"Task is in '{task.status}', not awaiting pull request publication approval.")
 
+    # Claim the approval before scheduling work so repeated clicks cannot publish twice.
+    task.status = "PR_CREATING"
+    db.commit()
     background_tasks.add_task(orchestrator.approve_pull_request, task_id)
     return {"status": "approved", "message": "Pull request publication approved. Nexus will now push the branch and create the PR."}
