@@ -63,8 +63,8 @@ class DeveloperAgent(BaseAgent):
             "Do not output TODOs, placeholders, or explanatory prose outside the JSON."
         )
         user_prompt = (
-            f"Approved PRD:\\n{json.dumps(prd_data, indent=2)}\\n\\n"
-            f"Approved architecture:\\n{json.dumps(arch_data, indent=2)}\\n\\n"
+            f"Approved PRD:\n{json.dumps(prd_data, indent=2)}\n\n"
+            f"Approved architecture:\n{json.dumps(arch_data, indent=2)}\n\n"
             f"Existing source files (empty means the file is planned for creation):\\n"
             f"{json.dumps(source_files, indent=2)}\\n\\n"
             f"Exact required paths, each exactly once: {json.dumps(planned_paths)}\\n"
@@ -153,7 +153,7 @@ class DeveloperAgent(BaseAgent):
         planned_modify = arch_data.get("files_to_modify") or []
         planned_create = arch_data.get("files_to_create") or []
         planned_count = len(set(str(p) for p in (planned_modify + planned_create)))
-        if self.client and (planned_count > 1 or planned_create):
+        if planned_count > 1 or planned_create:
             try:
                 return await self._execute_multi_file(
                     task_id, prd_data, arch_data, branch_name, fix_plan, run_id, tool_calls
