@@ -3,6 +3,7 @@ import logging
 from typing import Dict, Any, List
 from backend.agents.base_agent import BaseAgent
 from backend.tools.filesystem import list_files, read_file
+from backend.tools.project_inspector import inspect_project
 from backend.database.database import SessionLocal
 from backend.database.models import Architecture
 
@@ -118,7 +119,8 @@ class ArchitectAgent(BaseAgent):
                 except Exception:
                     pass
 
-        tech_stack = _detect_tech_stack(files, file_samples)
+        project_profile = inspect_project(task_id)
+        tech_stack = project_profile.get("profile", {}).get("stack") or _detect_tech_stack(files, file_samples)
         await self.emit_progress(task_id, "working", f"Detected tech stack: {tech_stack}. Designing architecture...")
 
         arch_data: Dict[str, Any] = {}
@@ -140,6 +142,7 @@ class ArchitectAgent(BaseAgent):
                 user_prompt = (
                     f"Approved PRD:\n{json.dumps(prd_data, indent=2)}\n\n"
                     f"Detected Tech Stack: {tech_stack}\n"
+                    f"Project Profile: {json.dumps(project_profile.get('profile', {}), indent=2)}\n"
                     f"Repository Files ({len(files)} total):\n{files[:50]}\n\n"
                     f"File Samples:\n{json.dumps(file_samples, indent=2)}"
                 )
