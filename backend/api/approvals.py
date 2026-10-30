@@ -50,3 +50,15 @@ async def reject_architecture(task_id: str, req: FeedbackRequest, db: Session = 
 
     await orchestrator.reject_architecture(task_id, req.feedback)
     return {"status": "rejected", "message": "Architecture rejected."}
+
+
+@router.post("/approve-pull-request")
+async def approve_pull_request(task_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task.status != "PR_PENDING_APPROVAL":
+        raise HTTPException(status_code=400, detail=f"Task is in '{task.status}', not awaiting pull request publication approval.")
+
+    background_tasks.add_task(orchestrator.approve_pull_request, task_id)
+    return {"status": "approved", "message": "Pull request publication approved. Nexus will now push the branch and create the PR."}
